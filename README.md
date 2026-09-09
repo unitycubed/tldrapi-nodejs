@@ -128,8 +128,8 @@ const result = await client.summarize(text, { allowOverage: true });
 | Option        | Default                            | Notes                                       |
 |---------------|------------------------------------|---------------------------------------------|
 | `rapidapiKey` | (required)                         | Your `X-RapidAPI-Key` from RapidAPI dashboard |
-| `rapidapiHost`| `tldrapi-summarization.p.rapidapi.com`            | Override for staging listings only          |
-| `baseUrl`     | `https://tldrapi-summarization.p.rapidapi.com`    | Change to point at a staging / mirror       |
+| `rapidapiHost`| `tldrapi-summarizer.p.rapidapi.com`            | Override for staging listings only          |
+| `baseUrl`     | `https://tldrapi-summarizer.p.rapidapi.com`    | Change to point at a staging / mirror       |
 | `timeoutMs`   | 60_000                             | Per-request; deep tier can take 30s         |
 | `retries`     | 3                                  | Retries on 5xx + network errors only        |
 | `fetchImpl`   | `globalThis.fetch`                 | Pass `node-fetch` or `undici` for Node <18  |
