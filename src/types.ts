@@ -67,7 +67,7 @@ export interface TLDRapiClientOptions {
      */
     rapidapiKey: string;
     /**
-     * The RapidAPI listing host, e.g. `tldrapi.p.rapidapi.com`.
+     * The RapidAPI listing host, e.g. `tldrapi-summarizer.p.rapidapi.com`.
      * Defaults to the marketplace listing; override when calling a
      * staging listing.
      */
