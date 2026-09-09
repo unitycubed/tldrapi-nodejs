@@ -38,7 +38,7 @@ import {
 // sends every request through the RapidAPI proxy. Direct-signup
 // (bypass RapidAPI) is post-launch — when it ships we'll add a
 // second constructor path.
-export const DEFAULT_RAPIDAPI_HOST = 'tldrapi-summarizer.p.rapidapi.com';
+export const DEFAULT_RAPIDAPI_HOST = 'tldrapi-summarization.p.rapidapi.com';
 const DEFAULT_BASE_URL = `https://${DEFAULT_RAPIDAPI_HOST}`;
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_RETRIES = 3;
