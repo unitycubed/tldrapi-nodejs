@@ -119,4 +119,6 @@ const result = await client.summarize(text, { allowOverage: true });
 
 ## License
 
-MIT.
+Released under the MIT License — see [LICENSE](LICENSE).
+
+Copyright (c) 2026 Ehren Biglari / Unity Cubed.
