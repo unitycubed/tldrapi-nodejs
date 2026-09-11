@@ -1,7 +1,3 @@
-> ### ⚠️ Service notice
->
-> **The RapidAPI listing that backs this SDK is temporarily unavailable while we work through a launch-day issue. Please check back in a few days.**
-
 # tldrapi — Node.js / TypeScript SDK for TLDRapi
 
 Official Node.js + TypeScript client for the [TLDRapi summarization API](https://tldrapi.com). Summarize text at five quality tiers, 20+ built-in voice styles, custom voices for paid tiers. Typed results, typed errors, retries, zero third-party HTTP dependencies (uses the Node 18+ built-in `fetch`).
@@ -19,6 +15,29 @@ yarn add tldrapi
 ```
 
 Node.js 18+.
+
+## Get your app's RapidAPI key
+
+1. Sign in at [rapidapi.com](https://rapidapi.com)
+2. Subscribe to the [TLDRapi Summarizer](https://rapidapi.com/thunderAPIs256/api/tldrapi-summarizer) listing (start with **BASIC** — free)
+3. Go to **Console** (top nav) → **Applications** → **Add App** (or open an existing one)
+4. In the App → **Authorizations** tab → click the copy icon next to your Authorization Key
+
+That's the app's `X-RapidAPI-Key`. Pass it to the SDK constructor.
+
+*Legacy path (deprecated): upper-right (?) → Legacy Developer Dashboard → Add New App → Authorization tab. The new Console path above is simpler.*
+
+The Authorization Key field is the same value in both places — RapidAPI just labels it differently depending on which interface you use:
+
+**New Console:**
+
+![RapidAPI Console — Authorization Method labeled "RAPIDAPI"](https://raw.githubusercontent.com/unitycubed/tldrapi-docs/main/img/rapidapi-key-label-console.png)
+
+**Legacy Developer Dashboard:**
+
+![RapidAPI Legacy Developer Dashboard — Authorization Method labeled "API key"](https://raw.githubusercontent.com/unitycubed/tldrapi-docs/main/img/rapidapi-key-label-legacy.png)
+
+
 
 ## Quickstart
 
@@ -109,8 +128,8 @@ const result = await client.summarize(text, { allowOverage: true });
 | Option        | Default                            | Notes                                       |
 |---------------|------------------------------------|---------------------------------------------|
 | `rapidapiKey` | (required)                         | Your `X-RapidAPI-Key` from RapidAPI dashboard |
-| `rapidapiHost`| `tldrapi.p.rapidapi.com`            | Override for staging listings only          |
-| `baseUrl`     | `https://unitycubed.dev/TLDRapi`    | Change to point at a staging / mirror       |
+| `rapidapiHost`| `tldrapi-summarizer.p.rapidapi.com`            | Override for staging listings only          |
+| `baseUrl`     | `https://tldrapi-summarizer.p.rapidapi.com`    | Change to point at a staging / mirror       |
 | `timeoutMs`   | 60_000                             | Per-request; deep tier can take 30s         |
 | `retries`     | 3                                  | Retries on 5xx + network errors only        |
 | `fetchImpl`   | `globalThis.fetch`                 | Pass `node-fetch` or `undici` for Node <18  |
@@ -123,4 +142,6 @@ const result = await client.summarize(text, { allowOverage: true });
 
 ## License
 
-MIT.
+Released under the MIT License — see [LICENSE](LICENSE).
+
+Copyright (c) 2026 Ehren Biglari / Unity Cubed.
