@@ -1,3 +1,6 @@
+> ### ⚠️ Service notice
+>
+> **The RapidAPI listing that backs this SDK is temporarily unavailable while we work through a launch-day issue. Please check back in a few days.**
 # tldrapi — Node.js / TypeScript SDK for TLDRapi
 
 Official Node.js + TypeScript client for the [TLDRapi summarization API](https://tldrapi.com). Summarize text at five quality tiers, 20+ built-in voice styles, custom voices for paid tiers. Typed results, typed errors, retries, zero third-party HTTP dependencies (uses the Node 18+ built-in `fetch`).
