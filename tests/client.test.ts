@@ -175,20 +175,40 @@ describe('TLDRapi SDK', () => {
 
     describe('rates + usage', () => {
         it('rates parsed', async () => {
-            const fetchImpl = makeFetchMock(makeResponse(200,
-                { quick: 1, standard: 6, deep: 32, premium: 120, ultra: 420, updated_at: '2026-08-31T00:00:00Z' }));
+            // Spec (openapi.yaml RatesResponse): tiers under credits_per_call,
+            // timestamp under credit_costs_updated_at. Pre-1.0 SDK read
+            // top-level fields the server never emitted.
+            const fetchImpl = makeFetchMock(makeResponse(200, {
+                credits_per_call: { quick: 1, standard: 6, deep: 32, premium: 120, ultra: 420 },
+                credit_costs_updated_at: '2026-08-31T00:00:00Z',
+                history_url: 'https://tldrapi.com/TLDRapi/rates/history',
+            }));
             const c = newClient(fetchImpl);
             const r = await c.rates();
             expect(r.standard).toBe(6);
-            expect(r.updatedAt).toBe('2026-08-31T00:00:00Z');
+            expect(r.creditCostsUpdatedAt).toBe('2026-08-31T00:00:00Z');
+            expect(r.updatedAt).toBe('2026-08-31T00:00:00Z'); // deprecated alias
+            expect(r.historyUrl).toBe('https://tldrapi.com/TLDRapi/rates/history');
         });
         it('usage parsed', async () => {
-            const fetchImpl = makeFetchMock(makeResponse(200,
-                { period: '2026-08', calls: 42, credits_charged: 210, credits_remaining: 89 }));
+            // Spec (openapi.yaml UsageResponse). Pre-1.0 SDK read
+            // period/calls/credits_charged/credits_remaining which the
+            // server has never emitted.
+            const fetchImpl = makeFetchMock(makeResponse(200, {
+                usage_count: 42,
+                successful_requests: 40,
+                failed_requests: 2,
+                plan: 'free',
+                limits: { per_minute: 3, daily: 100, credits: 100, concurrent: 1 },
+            }));
             const c = newClient(fetchImpl);
             const u = await c.usage();
-            expect(u.calls).toBe(42);
-            expect(u.creditsRemaining).toBe(89);
+            expect(u.usageCount).toBe(42);
+            expect(u.successfulRequests).toBe(40);
+            expect(u.failedRequests).toBe(2);
+            expect(u.plan).toBe('free');
+            expect(u.limits.perMinute).toBe(3);
+            expect(u.limits.credits).toBe(100);
         });
     });
 

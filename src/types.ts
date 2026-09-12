@@ -32,10 +32,29 @@ export interface SummarizeResult {
     raw: Record<string, unknown>;
 }
 
+/**
+ * Optional per-call generation config for `client.summarize(...)`.
+ * Omitted fields fall through to server tier defaults. Shape mirrors
+ * openapi.yaml SummarizeRequest.config.
+ */
+export interface SummarizeConfig {
+    modelAlias?: string;
+    temperature?: number;
+    topP?: number;
+    maxOutputTokens?: number;
+    maxInputTokens?: number;
+}
+
 export interface SummarizeOptions {
     tier?: QualityTier;
     sessionId?: string;
     modelAlias?: string;
+    /**
+     * Per-call generation overrides (temperature, top_p, max_output_tokens,
+     * max_input_tokens, model_alias). Omitted fields fall through to
+     * server tier defaults. Matches openapi.yaml SummarizeRequest.config.
+     */
+    config?: SummarizeConfig;
     allowOverage?: boolean;
     extraHeaders?: Record<string, string>;
     /** Per-call timeout override in ms. Overrides `TLDRapi` constructor `timeoutMs`. */
@@ -48,16 +67,190 @@ export interface Rates {
     deep: number;
     premium: number;
     ultra: number;
+    /** Matches openapi.yaml RatesResponse.credit_costs_updated_at. */
+    creditCostsUpdatedAt?: string;
+    /**
+     * Deprecated alias for `creditCostsUpdatedAt`. Kept for pre-1.0
+     * callers; prefer `creditCostsUpdatedAt`.
+     */
     updatedAt?: string;
+    /** Matches openapi.yaml RatesResponse.history_url. */
+    historyUrl: string;
     raw: Record<string, unknown>;
 }
 
+/**
+ * Plan-limit sub-object of UsageStats — populated when the server
+ * reports them; missing/undefined otherwise. Shape mirrors openapi.yaml
+ * UsageResponse.limits.
+ */
+export interface UsageLimits {
+    perMinute?: number;
+    daily?: number;
+    credits?: number;
+    concurrent?: number;
+}
+
+/**
+ * Return of `client.usage()`.
+ *
+ * Fields align with `docs/external/openapi.yaml` UsageResponse. Pre-1.0
+ * releases exposed `period/calls/creditsCharged/creditsRemaining` which
+ * never matched the server; those keys are gone. Callers who need
+ * something not hoisted can read `.raw`.
+ */
 export interface UsageStats {
-    period: string;
-    calls: number;
-    creditsCharged: number;
-    creditsRemaining: number;
+    usageCount: number;
+    successfulRequests: number;
+    failedRequests: number;
+    averageResponseTimeMs: number;
+    endpointsUsed: Record<string, unknown>;
+    errorRate: number;
+    plan: string;
+    limits: UsageLimits;
     raw: Record<string, unknown>;
+}
+
+/** Common result shape for text-body /convert endpoints. */
+export interface ConvertResult {
+    output: string;
+    outputFormat: string;
+    inputFormat: string;
+    inputBytes: number;
+    outputChars: number;
+    elapsedMs: number;
+    requestId: string;
+    warnings: unknown[];
+    raw: Record<string, unknown>;
+}
+
+/**
+ * Result of `client.convertPdfToLatex(...)`. If the gateway chose the
+ * async path (HTTP 202), `jobId` / `pollUrl` / `status` are set and
+ * `output` is empty — poll `pdfStatus(jobId)` until done.
+ */
+export interface PdfConvertResult {
+    // sync fields (or filled when async job completes)
+    output: string;
+    outputFormat: string;
+    inputFormat: string;
+    inputBytes: number;
+    pages: number;
+    elapsedMs: number;
+    backend: string;
+    requestId: string;
+    warnings: unknown[];
+    // async fields
+    jobId: string;
+    status: string;              // queued | running | done | failed
+    pollUrl: string;
+    estimatedSeconds: number;
+    raw: Record<string, unknown>;
+}
+
+export interface RatesHistoryChange {
+    changedAt: string;
+    tier: string;
+    creditsBefore: number;
+    creditsAfter: number;
+    reason: string;
+    operator: string;
+}
+
+export interface RatesHistory {
+    history: RatesHistoryChange[];
+    rangeDays: number;
+    totalChanges: number;
+    raw: Record<string, unknown>;
+}
+
+export interface UsageRangeDay {
+    date: string;
+    creditsUsed: number;
+    callCount: number;
+}
+
+export interface UsageRange {
+    from: string;
+    to: string;
+    creditsUsed: number;
+    daily: UsageRangeDay[];
+    raw: Record<string, unknown>;
+}
+
+export interface CustomPromptResult {
+    id: string;
+    voiceName: string;
+    status: string;
+    approved: boolean;
+    voiceReference?: string;
+    rejectionReason?: string;
+    updatedInPlace: boolean;
+    supersededIds: string[];
+    raw: Record<string, unknown>;
+}
+
+export interface CustomPromptSummary {
+    id: string;
+    voiceName: string;
+    status: string;
+    voiceReference?: string;
+    approvedAlias?: string;
+    rejectionReason?: string;
+    submittedAt: string;
+    reviewedAt: string;
+}
+
+export interface CustomPromptList {
+    customerId: string;
+    customPrompts: CustomPromptSummary[];
+    raw: Record<string, unknown>;
+}
+
+export interface CustomPromptDetail {
+    id: string;
+    customerId: string;
+    voiceName: string;
+    instruction: string;
+    status: string;
+    voiceReference?: string;
+    approvedAlias?: string;
+    rejectionReason?: string;
+    judgeVerdictJson: string;
+    submittedAt: string;
+    reviewedAt: string;
+    raw: Record<string, unknown>;
+}
+
+/** File input to a multipart /convert/* upload — path, Buffer, Blob, or Uint8Array. */
+export type FileInput = string | Uint8Array | Buffer | Blob | ArrayBuffer;
+
+export interface ConvertFileOptions {
+    filename?: string;
+    allowOverage?: boolean;
+    extraHeaders?: Record<string, string>;
+    timeoutMs?: number;
+}
+
+export interface ConvertTextOptions {
+    allowOverage?: boolean;
+    extraHeaders?: Record<string, string>;
+    timeoutMs?: number;
+}
+
+export interface ConvertPdfOptions extends ConvertFileOptions {
+    /** X-PDF-Backend header override — one of "auto"|"text"|"modal". */
+    backend?: 'auto' | 'text' | 'modal';
+}
+
+export interface CustomPromptSubmitOptions {
+    sessionId?: string;
+    allowOverage?: boolean;
+    extraHeaders?: Record<string, string>;
+}
+
+export interface CustomPromptListOptions {
+    sessionId?: string;
 }
 
 export interface TLDRapiClientOptions {
