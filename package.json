@@ -14,10 +14,10 @@
     "nlp"
   ],
   "homepage": "https://unitycubed.com/tldrapi",
-  "bugs": "https://github.com/unitycubedapps/tldrapi-node/issues",
+  "bugs": "https://github.com/unitycubed/tldrapi-nodejs/issues",
   "repository": {
     "type": "git",
-    "url": "https://github.com/unitycubedapps/tldrapi-node.git"
+    "url": "https://github.com/unitycubed/tldrapi-nodejs.git"
   },
   "license": "MIT",
   "author": {
