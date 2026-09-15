@@ -1,6 +1,6 @@
 {
   "name": "tldrapi",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Official Node.js/TypeScript SDK for the TLDRapi summarization API. Summarize text at 5 quality tiers with 20+ built-in voice styles.",
   "keywords": [
     "tldrapi",
