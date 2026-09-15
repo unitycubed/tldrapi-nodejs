@@ -43,7 +43,6 @@ Node.js 18+.
   - [Handle a rate-limit with backoff](#handle-a-rate-limit-with-backoff)
   - [Show live credit balance to your user](#show-live-credit-balance-to-your-user)
   - [Advanced quality controls — 3 axes, 30 named presets](#advanced-quality-controls)
-- [Quality tiers](#quality-tiers)
 - [Error handling](#error-handling)
 - [Configuration + retries](#configuration--retries)
 - [Rates + usage endpoints](#rates--usage-endpoints)
@@ -362,22 +361,7 @@ await client.summarize(text, {
 await client.summarize(text, { tier: 'premium', allowDowngrade: true });
 ```
 
-## Quality tiers
-
-Each tier is a canonical bundle of (LLM class, chunk size, extractive
-retention, inference strategy) tuned for a use case:
-
-| Tier      | Reads at once   | Best for                          |
-|-----------|----------------:|-----------------------------------|
-| quick     |     4K tokens   | Short texts, previews             |
-| standard  |    16K tokens   | Default — most articles           |
-| deep      |    32K tokens   | Longer content, deeper reasoning  |
-| premium   |    64K tokens   | Substantial documents             |
-| ultra     |   100K tokens   | Long-form / research-grade        |
-
-Full pricing detail (methodology, formula, dynamic-pricing audit trail): [tldrapi.com/pricing](https://tldrapi.com/pricing). Live per-tier rates via `/rates` or the SDK`s `rates()` method.
-
-### Paid-tier quality guarantees
+## Paid-tier quality guarantees
 
 Paid tiers WAIT for a specific canonical model rather than silently
 mixing peer models. Opt into permissive fallback with
