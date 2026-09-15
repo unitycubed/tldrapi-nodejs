@@ -4,7 +4,7 @@
 
 # tldrapi — Node.js / TypeScript SDK for TLDRapi
 
-Official Node.js + TypeScript client for the [TLDRapi summarization API](https://tldrapi.com). Summarize text at five quality tiers, 20+ built-in voice styles, custom voices for paid tiers. Typed results, typed errors, retries, zero third-party HTTP dependencies (uses the Node 18+ built-in `fetch`).
+Official Node.js + TypeScript client for the [TLDRapi summarization API](https://tldrapi.com). Summarize text at five quality levels, 20+ built-in voice styles, custom voices for paid tiers. Typed results, typed errors, retries, zero third-party HTTP dependencies (uses the Node 18+ built-in `fetch`).
 
 **TLDRapi is distributed through the RapidAPI marketplace at launch.** Subscribe to the TLDRapi listing on RapidAPI to get your `X-RapidAPI-Key`, then pass it to the client as `rapidapiKey`.
 
@@ -98,17 +98,29 @@ try {
 }
 ```
 
-## Quality tiers
+## Quality levels
 
-| Tier      | Credits/call | Max input tokens | Best for                          |
-|-----------|-------------:|-----------------:|-----------------------------------|
-| `quick`   |            1 |            4,000 | Short texts, low-latency previews |
-| `standard`|            5 |           16,000 | Default — modest documents        |
-| `deep`    |           30 |           32,000 | Longer content, deeper reasoning  |
-| `premium` |          110 |           64,000 | Substantial documents, high fidelity |
-| `ultra`   |          400 |          100,000 | Long-form / research-grade        |
+| Level     | Max chunk tokens | Best for                          |
+|-----------|-----------------:|-----------------------------------|
+| `quick`   |            4,000 | Short texts, low-latency previews |
+| `standard`|           16,000 | Default — modest documents        |
+| `deep`    |           32,000 | Longer content, deeper reasoning  |
+| `premium` |           64,000 | Substantial documents, high fidelity |
+| `ultra`   |          100,000 | Long-form / research-grade        |
 
-Credit costs are dynamic — check current with `client.rates()`.
+**Credit pricing (v2.1)** — credits scale with input size:
+
+```
+cost = 1 (extractive_fee)
+     + Σ over chunks of (base × ceil(chunk_tokens / 1000))
+```
+
+Base costs and chunk sizing are dynamic. Fetch the current schedule at
+`GET /rates` (or via `client.rates()` — returns
+`base_costs_per_1k_input_tokens`, `retention_ratios`,
+`chunk_caps_tokens`, `extractive_fee_credits`). There is no
+per-request input-size limit besides the 10 MB request-body cap at
+the edge — long documents are split into chunks internally.
 
 ## Session pinning
 
@@ -126,6 +138,81 @@ Pay 2× rate instead of getting a 402 when your balance runs low:
 ```typescript
 const result = await client.summarize(text, { allowOverage: true });
 ```
+
+## Advanced quality controls (v-session129+)
+
+Every summarize call is parameterized by three orthogonal knobs. Send
+zero of them (default `standard` preset) — or send `tier` for a named
+preset — or set 1-3 optional axis fields. Both work together: axes
+override the preset and the response returns `X-Quality-Warning`.
+
+**30 named presets.** `tier` can be any of `{minimal|brief|balanced|
+thorough|detailed|complete}-{quick|standard|deep|premium|ultra}` (e.g.
+`thorough-standard`, `complete-quick`). Five short names — `quick /
+standard / deep / premium / ultra` — are the SCORECARD-validated
+highlighted presets; the other 25 are extrapolated from the same grid.
+
+**Three optional axis overrides.** Any subset:
+
+- `optionalQuality` — LLM tier: `quick | standard | deep | premium | ultra`
+- `optionalExtractiveLvl` — retention: `minimal | brief | balanced | thorough | detailed | complete`
+- `optionalStrategy` — `contextual-compression | premium-single-shot | hierarchical-merge`
+
+```typescript
+// Named preset (extrapolated tuple)
+await client.summarize(text, { tier: 'thorough-quick' });
+
+// One axis override (drops down from premium's default extractive)
+await client.summarize(text, {
+  tier: 'premium',
+  optionalExtractiveLvl: 'brief'
+});
+
+// All three axes
+await client.summarize(text, {
+  optionalQuality: 'ultra',
+  optionalExtractiveLvl: 'complete',
+  optionalStrategy: 'premium-single-shot'
+});
+```
+
+### Paid-tier quality guarantees
+
+By default paid-tier calls WAIT for the exact model your quality level
+maps to (strict mode). Opt into permissive fallback with
+`allowDowngrade: true`:
+
+```typescript
+const r = await client.summarize(text, {
+  tier: 'premium',
+  allowDowngrade: true,
+});
+// Response may set X-Quality-Actual naming the tier that actually served.
+```
+
+### Async submit + poll (long-running jobs)
+
+For calls that may exceed your HTTP client timeout:
+
+```typescript
+const requestId = await client.submitAsync(text, { tier: 'ultra' });
+const result = await client.waitForResult(requestId, {
+  timeoutMs: 300000,       // 5-min client-side cap; null = no cap
+  pollIntervalMs: 5000,
+});
+```
+
+Or manual polling:
+
+```typescript
+const result = await client.getResult(requestId);
+if (result === null) {
+  // still queued — poll again after ~5s
+}
+```
+
+Credits are deducted at submit time and refunded on failure like sync.
+Composes freely with `allowDowngrade` + optional axes.
 
 ## Configuration
 

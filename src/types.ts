@@ -56,6 +56,14 @@ export interface SummarizeOptions {
      */
     config?: SummarizeConfig;
     allowOverage?: boolean;
+    /** #422 Opt-in permissive downgrade on paid-tier calls. */
+    allowDowngrade?: boolean;
+    /** #434 Optional LLM axis override — `quick|standard|deep|premium|ultra`. */
+    optionalQuality?: string;
+    /** #434 Optional extractive axis override — `minimal|brief|balanced|thorough|detailed|complete`. */
+    optionalExtractiveLvl?: string;
+    /** #434 Optional strategy override — `contextual-compression|premium-single-shot|hierarchical-merge`. */
+    optionalStrategy?: string;
     extraHeaders?: Record<string, string>;
     /** Per-call timeout override in ms. Overrides `TLDRapi` constructor `timeoutMs`. */
     timeoutMs?: number;

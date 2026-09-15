@@ -191,6 +191,12 @@ export class TLDRapi {
         const tier = validateTier(options.tier);
         const headers = buildHeaders(this.rapidapiKey, this.rapidapiHost, tier, options.extraHeaders);
         if (options.allowOverage) headers['X-Allow-Overage'] = 'true';
+        // #422 opt-in permissive downgrade
+        if (options.allowDowngrade) headers['X-Allow-Downgrade'] = 'true';
+        // #434 3-axis optional overrides
+        if (options.optionalQuality) headers['X-Optional-Quality'] = String(options.optionalQuality);
+        if (options.optionalExtractiveLvl) headers['X-Optional-Extractive-Lvl'] = String(options.optionalExtractiveLvl);
+        if (options.optionalStrategy) headers['X-Optional-Strategy'] = String(options.optionalStrategy);
 
         const body: Record<string, unknown> = { input_text: inputText };
         if (options.sessionId) body.session_id = options.sessionId;
@@ -222,6 +228,83 @@ export class TLDRapi {
             });
         }
         return buildSummarizeResult(parsed as Record<string, unknown>, resp.headers);
+    }
+
+    /**
+     * #423 Async paid-tier submit. Returns a request_id; retrieve the
+     * summary via `getResult(id)` or `waitForResult(id)`. Credits are
+     * deducted at submit time and refunded on failure like sync summarize.
+     */
+    async submitAsync(inputText: string, options: SummarizeOptions = {}): Promise<string> {
+        if (!inputText || typeof inputText !== 'string') {
+            throw new Error('inputText must be a non-empty string');
+        }
+        const tier = validateTier(options.tier);
+        const headers = buildHeaders(this.rapidapiKey, this.rapidapiHost, tier, options.extraHeaders);
+        headers['X-Async'] = 'true';
+        if (options.allowDowngrade) headers['X-Allow-Downgrade'] = 'true';
+        if (options.optionalQuality) headers['X-Optional-Quality'] = String(options.optionalQuality);
+        if (options.optionalExtractiveLvl) headers['X-Optional-Extractive-Lvl'] = String(options.optionalExtractiveLvl);
+        if (options.optionalStrategy) headers['X-Optional-Strategy'] = String(options.optionalStrategy);
+        const resp = await this.request('POST', '/summarize', {
+            body: JSON.stringify({ input_text: inputText }),
+            headers,
+            timeoutMs: options.timeoutMs,
+        });
+        const parsed = await parseBody(resp);
+        if (resp.status !== 202) raiseForResponse(resp.status, parsed, resp.headers);
+        const rid = resp.headers.get('x-paid-request-id')
+            ?? (parsed as Record<string, unknown>)?.request_id as string | undefined;
+        if (!rid || typeof rid !== 'string') {
+            throw new ServerError('async submit returned no X-Paid-Request-Id', {
+                statusCode: resp.status,
+                requestId: resp.headers.get('x-request-id') ?? '',
+            });
+        }
+        return rid;
+    }
+
+    /**
+     * #423 Fetch async result. Returns null if still queued (server 202).
+     * Returns SummarizeResult on 200. Throws on 4xx/5xx.
+     */
+    async getResult(requestId: string): Promise<SummarizeResult | null> {
+        if (!requestId) throw new Error('requestId is required');
+        const headers = buildHeaders(this.rapidapiKey, this.rapidapiHost, undefined);
+        const resp = await this.request('GET', `/paid/result/${encodeURIComponent(requestId)}`, {
+            headers,
+        });
+        if (resp.status === 202) return null;
+        const parsed = await parseBody(resp);
+        if (resp.status >= 400) raiseForResponse(resp.status, parsed, resp.headers);
+        if (!parsed || typeof parsed !== 'object') {
+            throw new ServerError(`unexpected non-JSON result: ${String(parsed).slice(0, 200)}`, {
+                statusCode: resp.status,
+                requestId: resp.headers.get('x-request-id') ?? '',
+            });
+        }
+        return buildSummarizeResult(parsed as Record<string, unknown>, resp.headers);
+    }
+
+    /**
+     * #423 Block-poll until the async result is ready.
+     * `timeoutMs` — max wait (client-side); `undefined` = no cap.
+     * `pollIntervalMs` — default 5000 (matches server Retry-After).
+     */
+    async waitForResult(
+        requestId: string,
+        opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+    ): Promise<SummarizeResult> {
+        const poll = opts.pollIntervalMs ?? 5000;
+        const deadline = opts.timeoutMs == null ? null : Date.now() + opts.timeoutMs;
+        for (;;) {
+            const result = await this.getResult(requestId);
+            if (result) return result;
+            if (deadline != null && Date.now() >= deadline) {
+                throw new Error(`waitForResult: ${requestId} still pending after ${opts.timeoutMs}ms`);
+            }
+            await new Promise(r => setTimeout(r, poll));
+        }
     }
 
     async rates(): Promise<Rates> {
