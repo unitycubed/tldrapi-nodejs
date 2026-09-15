@@ -1,14 +1,20 @@
-> ### ⚠️ Service notice
->
-> **The RapidAPI listing that backs this SDK is temporarily unavailable while we work through a launch-day issue. Please check back in a few days.**
-
 # tldrapi — Node.js / TypeScript SDK for TLDRapi
 
-Official Node.js + TypeScript client for the [TLDRapi summarization API](https://tldrapi.com). Summarize text at five quality levels, 20+ built-in voice styles, custom voices for paid tiers. Typed results, typed errors, retries, zero third-party HTTP dependencies (uses the Node 18+ built-in `fetch`).
+Official Node.js + TypeScript client for [TLDRapi](https://tldrapi.com) —
+turn any content into a clean summary in one API call.
 
-**TLDRapi is distributed through the RapidAPI marketplace at launch.** Subscribe to the TLDRapi listing on RapidAPI to get your `X-RapidAPI-Key`, then pass it to the client as `rapidapiKey`.
-
-## Install
+- **Free tier** — 100 credits per month, no card, no trial expiry
+- **20+ input formats** — text, HTML, Markdown, PDF (with OCR), .docx,
+  .doc, .odt, .rtf, .epub, JSON, YAML, CSV, transcripts
+- **5 quality tiers** — pick latency vs. depth per call
+- **Custom voice styles** — 20+ built-in voices; paid tiers can define
+  their own with plain-English instructions
+- **Multi-provider routing** — automatic failover across Anthropic,
+  OpenAI, Groq, Gemini, and OpenRouter
+- **Refunds you don't have to ask for** — every summary is judge-scored
+  and mis-summaries are auto-refunded
+- **First-class TypeScript** — typed results, typed errors, no third-party
+  HTTP deps (uses Node 18+ built-in `fetch`)
 
 ```bash
 npm install tldrapi
@@ -20,44 +26,50 @@ yarn add tldrapi
 
 Node.js 18+.
 
-## Get your app's RapidAPI key
+## Table of contents
+
+- [Getting your free key](#getting-your-free-key)
+- [Hello world](#hello-world)
+- [Examples gallery](#examples-gallery)
+  - [Summarize an article by URL](#summarize-an-article-by-url)
+  - [Summarize a PDF (with OCR)](#summarize-a-pdf-with-ocr)
+  - [Summarize a Word / RTF / EPUB file](#summarize-a-word--rtf--epub-file)
+  - [Summarize a long document asynchronously](#summarize-a-long-document-asynchronously)
+  - [Pin a session across many summaries](#pin-a-session-across-many-summaries)
+  - [Batch summarize in parallel](#batch-summarize-in-parallel)
+  - [Convert-only: extract text without summarizing](#convert-only-extract-text-without-summarizing)
+  - [PDF → LaTeX](#pdf--latex)
+  - [Custom voice: teach the model your tone](#custom-voice-teach-the-model-your-tone)
+  - [Handle a rate-limit with backoff](#handle-a-rate-limit-with-backoff)
+  - [Show live credit balance to your user](#show-live-credit-balance-to-your-user)
+  - [Advanced quality controls — 3 axes, 30 named presets](#advanced-quality-controls)
+- [Quality tiers](#quality-tiers)
+- [Error handling](#error-handling)
+- [Configuration + retries](#configuration--retries)
+- [Rates + usage endpoints](#rates--usage-endpoints)
+- [License](#license)
+
+## Getting your free key
 
 1. Sign in at [rapidapi.com](https://rapidapi.com)
-2. Subscribe to the [TLDRapi Summarizer](https://rapidapi.com/thunderAPIs256/api/tldrapi-summarizer) listing (start with **BASIC** — free)
-3. Go to **Console** (top nav) → **Applications** → **Add App** (or open an existing one)
-4. In the App → **Authorizations** tab → click the copy icon next to your Authorization Key
+2. Subscribe to the [TLDRapi Summarizer](https://rapidapi.com/thunderAPIs256/api/tldrapi-summarizer)
+   listing — choose **BASIC (Free)**
+3. Open the listing → **Console** → **Applications** → **Add App**
+4. In the App → **Authorizations** tab → copy the Authorization Key
 
-That's the app's `X-RapidAPI-Key`. Pass it to the SDK constructor.
+Pass it to the SDK constructor as `rapidapiKey`. Everything on the
+free tier works exactly like the paid tiers — same endpoints, same
+response shape, same SDK — just with a 100-credit monthly cap.
 
-*Legacy path (deprecated): upper-right (?) → Legacy Developer Dashboard → Add New App → Authorization tab. The new Console path above is simpler.*
-
-The Authorization Key field is the same value in both places — RapidAPI just labels it differently depending on which interface you use:
-
-**New Console:**
-
-![RapidAPI Console — Authorization Method labeled "RAPIDAPI"](https://raw.githubusercontent.com/unitycubed/tldrapi-docs/main/img/rapidapi-key-label-console.png)
-
-**Legacy Developer Dashboard:**
-
-![RapidAPI Legacy Developer Dashboard — Authorization Method labeled "API key"](https://raw.githubusercontent.com/unitycubed/tldrapi-docs/main/img/rapidapi-key-label-legacy.png)
-
-
-
-## Quickstart
+## Hello world
 
 ```typescript
 import { TLDRapi } from 'tldrapi';
 
 const client = new TLDRapi({ rapidapiKey: 'YOUR_RAPIDAPI_KEY' });
 
-const result = await client.summarize(
-    'Some long text here...',
-    { tier: 'standard' },     // 'quick' | 'standard' | 'deep' | 'premium' | 'ultra'
-);
-
+const result = await client.summarize('Some long article body here...');
 console.log(result.summary);
-console.log(`used ${result.usage.outputTokens} output tokens on ${result.usage.modelUsed}`);
-console.log(`request id (for support): ${result.requestId}`);
 ```
 
 Or plain JavaScript:
@@ -68,28 +80,308 @@ const client = new TLDRapi({ rapidapiKey: 'YOUR_RAPIDAPI_KEY' });
 const result = await client.summarize('Long text...');
 ```
 
-## Handling errors
+The result also carries `result.requestId` (share with support when
+reporting issues), `result.sessionId` (see [session pinning](#pin-a-session-across-many-summaries)),
+and `result.credits` (snapshot of what this call cost and what you
+have left).
 
-Every failure extends `TLDRapiError`. Catch the base for a safety net, or catch specific subclasses to branch on failure mode.
+## Examples gallery
+
+### Summarize an article by URL
+
+TLDRapi accepts URLs directly — the server fetches, extracts main
+content, strips nav/ads, and summarizes.
+
+```typescript
+const r = await client.summarize(
+    'https://arxiv.org/abs/1706.03762',
+    { tier: 'deep' },
+);
+console.log(r.summary);
+```
+
+Works with HTML pages, news sites, GitHub READMEs, blog posts, and
+academic PDFs served over HTTP.
+
+### Summarize a PDF (with OCR)
+
+```typescript
+import { readFileSync } from 'node:fs';
+
+// PDF with selectable text — instant path
+const pdf = readFileSync('report.pdf');
+const text = await client.convertPdfToLatex(pdf, { filename: 'report.pdf' });
+
+// Scanned PDF (no selectable text) — automatic OCR fallback
+const scanned = readFileSync('scanned.pdf');
+const ocr = await client.convertPdfToLatex(scanned, {
+    filename: 'scanned.pdf',
+    backend: 'modal',
+});
+```
+
+`convertPdfToLatex` returns LaTeX suitable for downstream typesetting,
+or a plain markdown-style text if you don't need LaTeX. Pipe it back
+into `summarize()` if all you want is a summary.
+
+### Summarize a Word / RTF / EPUB file
+
+```typescript
+import { readFileSync } from 'node:fs';
+
+const docx = readFileSync('chapter.docx');
+const doc = await client.convertDocxToText(docx, { filename: 'chapter.docx' });
+
+const r = await client.summarize(doc.output, { tier: 'premium' });
+console.log(r.summary);
+```
+
+Same pattern for `.doc`, `.odt`, `.rtf`, `.epub`, `.html`, `.md`,
+`.json`, `.yaml`, `.csv`.
+
+### Summarize a long document asynchronously
+
+For inputs that may take longer than your HTTP client timeout, submit
+async and poll:
+
+```typescript
+const requestId = await client.submitAsync(giantDocument, { tier: 'ultra' });
+
+// blocks + polls in the background; 5-min cap by default
+const result = await client.waitForResult(requestId, {
+    timeoutMs: 300_000,
+    pollIntervalMs: 5_000,
+});
+console.log(result.summary);
+```
+
+Or poll manually:
+
+```typescript
+const requestId = await client.submitAsync(giantDocument, { tier: 'ultra' });
+
+while (true) {
+    const r = await client.getResult(requestId);
+    if (r !== null) { console.log(r.summary); break; }
+    await new Promise((res) => setTimeout(res, 5_000));
+}
+```
+
+Credits are deducted at submit time and refunded on failure, same as
+sync.
+
+### Pin a session across many summaries
+
+Session pinning keeps the same underlying model — and, in the future,
+the same in-memory context — for a batch of related documents:
+
+```typescript
+const r1 = await client.summarize('Doc 1');
+const r2 = await client.summarize('Doc 2', { sessionId: r1.sessionId });
+const r3 = await client.summarize('Doc 3', { sessionId: r1.sessionId });
+```
+
+Useful when you want consistent voice across a run — legal briefs in
+the same case file, chapters of the same book, tickets in the same
+support thread.
+
+### Batch summarize in parallel
+
+```typescript
+const summaries = await Promise.all(
+    texts.map((t) => client.summarize(t, { tier: 'quick' })),
+);
+```
+
+The client is fully concurrent-safe. Free-tier is rate-limited so
+throttle to ~3 rps; paid tiers are much higher.
+
+### Convert-only: extract text without summarizing
+
+Sometimes you just want the text — pull the words out of a doc without
+paying for a summary:
+
+```typescript
+const r = await client.convertHtmlToText('<h1>Hi</h1><p>Content...</p>');
+console.log(r.output);
+```
+
+Available: `convertJsonToText`, `convertHtmlToText`, `convertMdToText`,
+`convertDocToText`, `convertDocxToText`.
+
+### PDF → LaTeX
+
+Round-trip a PDF through TLDRapi's PDF pipeline and get LaTeX back —
+handy when the downstream is a document generator:
+
+```typescript
+const pdf = readFileSync('paper.pdf');
+let r = await client.convertPdfToLatex(pdf, { filename: 'paper.pdf' });
+
+if (r.jobId) {
+    // server chose async path — poll status until done
+    while (r.status !== 'done') {
+        await new Promise((res) => setTimeout(res, 5_000));
+        r = await client.pdfStatus(r.jobId);
+    }
+}
+console.log(r.output);  // LaTeX source
+```
+
+### Custom voice: teach the model your tone
+
+Paid tiers can register a natural-language voice instruction and reuse
+it as a per-call `voiceName` on future summaries:
+
+```typescript
+const sub = await client.customPromptSubmit({
+    voiceName: 'brand-tone',
+    instruction: [
+        'Write in the second person, active voice.',
+        'Prefer verbs over nouns. Keep sentences under 20 words.',
+        "Avoid corporate jargon ('leverage', 'synergy').",
+        'Aim for the reading level of a well-written newspaper.',
+    ].join(' '),
+});
+// sub.id is your prompt id; sub.status transitions from 'pending' → 'approved'/'rejected'
+```
+
+Once approved:
+
+```typescript
+const r = await client.summarize(text, { voiceName: 'brand-tone' });
+```
+
+Approval is automatic — the server runs the instruction against a
+judge that checks for policy compliance. Rejections come back with
+`sub.rejectionReason`.
+
+### Handle a rate-limit with backoff
+
+```typescript
+import { RateLimitError } from 'tldrapi';
+
+for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+        const r = await client.summarize(text, { tier: 'deep' });
+        break;
+    } catch (e) {
+        if (!(e instanceof RateLimitError)) throw e;
+        await new Promise((res) =>
+            setTimeout(res, (e.retryAfterSeconds || 60) * 1000)
+        );
+    }
+}
+```
+
+The SDK exposes the server's `Retry-After` header on
+`RateLimitError.retryAfterSeconds`.
+
+### Show live credit balance to your user
+
+```typescript
+const u = await client.usage();
+console.log(`You have ${u.creditsRemaining} credits left (${u.plan})`);
+
+const r = await client.summarize(text);
+console.log(`That call cost ${r.credits.charged} credits.`);
+console.log(`Remaining: ${r.credits.remaining}`);
+```
+
+Every summarize response carries a `credits` snapshot so you don't
+need a separate `usage()` round-trip on every call.
+
+### Advanced quality controls
+
+Every summarize call has three orthogonal knobs. You can send zero of
+them (defaults are fine), or a named preset, or set 1-3 optional axes,
+or combine — axes override the preset and the server returns
+`X-Quality-Warning`.
+
+**30 named presets.** `tier` can be one of five short names —
+`quick`, `standard`, `deep`, `premium`, `ultra` — or one of 25
+compound names like `thorough-standard` or `complete-quick`.
+
+**Three optional axis overrides.** Any subset:
+
+- `optionalQuality` — LLM tier: `quick | standard | deep | premium | ultra`
+- `optionalExtractiveLvl` — retention level: `minimal | brief | balanced | thorough | detailed | complete`
+- `optionalStrategy` — inference strategy: `contextual-compression | premium-single-shot | hierarchical-merge`
+
+```typescript
+// named preset
+await client.summarize(text, { tier: 'thorough-quick' });
+
+// preset + one axis override — axes win, warning header returned
+await client.summarize(text, {
+    tier: 'premium',
+    optionalExtractiveLvl: 'brief',
+});
+
+// all three axes, no preset
+await client.summarize(text, {
+    optionalQuality: 'ultra',
+    optionalExtractiveLvl: 'complete',
+    optionalStrategy: 'premium-single-shot',
+});
+
+// opt into permissive downgrade on paid-tier
+await client.summarize(text, { tier: 'premium', allowDowngrade: true });
+```
+
+## Quality tiers
+
+Each tier is a canonical bundle of (LLM class, chunk size, extractive
+retention, inference strategy) tuned for a use case:
+
+| Tier      | Reads at once   | Best for                          |
+|-----------|----------------:|-----------------------------------|
+| quick     |     4K tokens   | Short texts, previews             |
+| standard  |    16K tokens   | Default — most articles           |
+| deep      |    32K tokens   | Longer content, deeper reasoning  |
+| premium   |    64K tokens   | Substantial documents             |
+| ultra     |   100K tokens   | Long-form / research-grade        |
+
+Live rates and per-tier detail available at
+[/rates](https://tldrapi.com/rates) or `client.rates()`.
+
+### Paid-tier quality guarantees
+
+Paid tiers WAIT for a specific canonical model rather than silently
+mixing peer models. Opt into permissive fallback with
+`allowDowngrade: true` — the worker walks DOWN the ladder (premium →
+deep → standard → quick) and returns whichever tier's primary is
+available. Response carries `X-Quality-Actual` and `X-Original-Tier`
+when a downgrade happened, and the credit-cost delta is automatically
+refunded.
+
+## Error handling
+
+Every SDK exception inherits from `TLDRapiError`. Catch broadly for a
+safety net or narrowly to branch on failure mode:
 
 ```typescript
 import {
     TLDRapi, TLDRapiError,
     InsufficientCreditsError, RateLimitError,
-    LanguageNotSupportedError,
+    LanguageNotSupportedError, AuthenticationError,
+    ServerError, TimeoutError,
 } from 'tldrapi';
 
 try {
-    const result = await client.summarize(text, { tier: 'deep' });
+    const r = await client.summarize(text, { tier: 'deep' });
 } catch (e) {
     if (e instanceof InsufficientCreditsError) {
-        const topupUrl = (e.responseBody.options as any)?.top_up?.url;
-        // show user the topup options
+        const topUpUrl = (e.responseBody.options as any)?.top_up?.url;
+        // …prompt user to top up…
     } else if (e instanceof RateLimitError) {
-        await new Promise(r => setTimeout(r, (e.retryAfterSeconds || 60) * 1000));
-        // retry
+        await new Promise((r) => setTimeout(r, (e.retryAfterSeconds || 60) * 1000));
     } else if (e instanceof LanguageNotSupportedError) {
-        // English only at launch
+        // English-only at launch; cross-lingual coming Month 2-3
+    } else if (e instanceof AuthenticationError) {
+        // Bad key
+    } else if (e instanceof TimeoutError) {
+        // long inputs on deep+ can legitimately need >60s
     } else if (e instanceof TLDRapiError) {
         console.error(`TLDRapi error ${e.statusCode} (req ${e.requestId}): ${e.message}`);
     } else {
@@ -98,138 +390,36 @@ try {
 }
 ```
 
-## Quality levels
+Every error carries `.statusCode`, `.requestId` (X-Request-ID —
+attach when reporting bugs), and `.responseBody` (parsed JSON error
+body).
 
-| Level     | Max chunk tokens | Best for                          |
-|-----------|-----------------:|-----------------------------------|
-| `quick`   |            4,000 | Short texts, low-latency previews |
-| `standard`|           16,000 | Default — modest documents        |
-| `deep`    |           32,000 | Longer content, deeper reasoning  |
-| `premium` |           64,000 | Substantial documents, high fidelity |
-| `ultra`   |          100,000 | Long-form / research-grade        |
-
-**Credit pricing (v2.1)** — credits scale with input size:
-
-```
-cost = 1 (extractive_fee)
-     + Σ over chunks of (base × ceil(chunk_tokens / 1000))
-```
-
-Base costs and chunk sizing are dynamic. Fetch the current schedule at
-`GET /rates` (or via `client.rates()` — returns
-`base_costs_per_1k_input_tokens`, `retention_ratios`,
-`chunk_caps_tokens`, `extractive_fee_credits`). There is no
-per-request input-size limit besides the 10 MB request-body cap at
-the edge — long documents are split into chunks internally.
-
-## Session pinning
-
-To keep the same model / session state across calls:
+## Configuration + retries
 
 ```typescript
-const r1 = await client.summarize('First document');
-const r2 = await client.summarize('Second document', { sessionId: r1.sessionId });
-```
-
-## Overage
-
-Pay 2× rate instead of getting a 402 when your balance runs low:
-
-```typescript
-const result = await client.summarize(text, { allowOverage: true });
-```
-
-## Advanced quality controls (v-session129+)
-
-Every summarize call is parameterized by three orthogonal knobs. Send
-zero of them (default `standard` preset) — or send `tier` for a named
-preset — or set 1-3 optional axis fields. Both work together: axes
-override the preset and the response returns `X-Quality-Warning`.
-
-**30 named presets.** `tier` can be any of `{minimal|brief|balanced|
-thorough|detailed|complete}-{quick|standard|deep|premium|ultra}` (e.g.
-`thorough-standard`, `complete-quick`). Five short names — `quick /
-standard / deep / premium / ultra` — are the SCORECARD-validated
-highlighted presets; the other 25 are extrapolated from the same grid.
-
-**Three optional axis overrides.** Any subset:
-
-- `optionalQuality` — LLM tier: `quick | standard | deep | premium | ultra`
-- `optionalExtractiveLvl` — retention: `minimal | brief | balanced | thorough | detailed | complete`
-- `optionalStrategy` — `contextual-compression | premium-single-shot | hierarchical-merge`
-
-```typescript
-// Named preset (extrapolated tuple)
-await client.summarize(text, { tier: 'thorough-quick' });
-
-// One axis override (drops down from premium's default extractive)
-await client.summarize(text, {
-  tier: 'premium',
-  optionalExtractiveLvl: 'brief'
-});
-
-// All three axes
-await client.summarize(text, {
-  optionalQuality: 'ultra',
-  optionalExtractiveLvl: 'complete',
-  optionalStrategy: 'premium-single-shot'
+const client = new TLDRapi({
+    rapidapiKey: 'YOUR_KEY',
+    rapidapiHost: 'tldrapi-summarizer.p.rapidapi.com',  // staging override
+    baseUrl: undefined,                          // default = https://{rapidapiHost}
+    timeoutMs: 60_000,                           // per-request
+    retries: 3,                                  // 5xx + network only
+    // fetchImpl: undici.fetch,                  // pass node-fetch/undici for Node <18
 });
 ```
 
-### Paid-tier quality guarantees
+Automatic retries on 5xx and transient network failures with
+exponential backoff + jitter (3 attempts default). 4xx and 429 are
+**not** retried — the SDK exposes `RateLimitError.retryAfterSeconds`
+so you can honor the server's window.
 
-By default paid-tier calls WAIT for the exact model your quality level
-maps to (strict mode). Opt into permissive fallback with
-`allowDowngrade: true`:
-
-```typescript
-const r = await client.summarize(text, {
-  tier: 'premium',
-  allowDowngrade: true,
-});
-// Response may set X-Quality-Actual naming the tier that actually served.
-```
-
-### Async submit + poll (long-running jobs)
-
-For calls that may exceed your HTTP client timeout:
+## Rates + usage endpoints
 
 ```typescript
-const requestId = await client.submitAsync(text, { tier: 'ultra' });
-const result = await client.waitForResult(requestId, {
-  timeoutMs: 300000,       // 5-min client-side cap; null = no cap
-  pollIntervalMs: 5000,
-});
+const rates = await client.rates();
+const usage = await client.usage();
+const history = await client.ratesHistory();
+const range = await client.usageRange('2026-09-01', '2026-09-15');
 ```
-
-Or manual polling:
-
-```typescript
-const result = await client.getResult(requestId);
-if (result === null) {
-  // still queued — poll again after ~5s
-}
-```
-
-Credits are deducted at submit time and refunded on failure like sync.
-Composes freely with `allowDowngrade` + optional axes.
-
-## Configuration
-
-| Option        | Default                            | Notes                                       |
-|---------------|------------------------------------|---------------------------------------------|
-| `rapidapiKey` | (required)                         | Your `X-RapidAPI-Key` from RapidAPI dashboard |
-| `rapidapiHost`| `tldrapi-summarizer.p.rapidapi.com`            | Override for staging listings only          |
-| `baseUrl`     | `https://tldrapi-summarizer.p.rapidapi.com`    | Change to point at a staging / mirror       |
-| `timeoutMs`   | 60_000                             | Per-request; deep tier can take 30s         |
-| `retries`     | 3                                  | Retries on 5xx + network errors only        |
-| `fetchImpl`   | `globalThis.fetch`                 | Pass `node-fetch` or `undici` for Node <18  |
-
-## Support
-
-- Issues: <https://github.com/unitycubedapps/tldrapi-node/issues>
-- Docs:   <https://unitycubed.dev/tldrapi/docs>
-- Legal:  <https://unitycubed.dev/tldrapi/legal>
 
 ## License
 
